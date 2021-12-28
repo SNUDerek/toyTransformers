@@ -60,7 +60,7 @@ class MultiHeadAttention(torch.nn.Module):
         
         return scores, output
     
-    
+
 class PositionWiseFeedForward(torch.nn.Module):
     """position-wise FFNN"""
     
@@ -76,4 +76,23 @@ class PositionWiseFeedForward(torch.nn.Module):
     def forward(self, x):
         x = self.linear2(self.activation(self.linear1(x)))
         return x
+
+
+class SinusoidalPositionalEncoding(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+
+    def forward(self, embeddings):
+        b, l, d = embeddings.shape
+        device = embeddings.device
+        
+        # create positional encoding
+        pos_encoding = torch.arange(0, l).unsqueeze(1).repeat(1, d).float().to(device)  # index each step
+        denominator = 1. / (10000 ** (torch.arange(0, d, 2).float() / d)).to(device)    # denominator of inner term
+        pos_encoding[:, 0::2] = torch.sin(pos_encoding[:, 0::2] * denominator)  # apply sine to every other
+        pos_encoding[:, 1::2] = torch.cos(pos_encoding[:, 1::2] * denominator)  # apply cosine to every other
+        embeddings += pos_encoding.unsqueeze(0).repeat(b, 1, 1)
+        
+        return embeddings
     

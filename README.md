@@ -9,7 +9,7 @@ inspired by (minGPT)[https://github.com/karpathy/minGPT], i wanted to see if i c
 ## current status & plans
 
 - [x] multi-head attention
-- [ ] sinusoidal positional encoding
+- [x] sinusoidal positional encoding
 - [ ] basic transformer encoder, from [*Attention is All You Need*](https://arxiv.org/abs/1706.03762)
 - [ ] basic transformer decoder, from [*Attention is All You Need*](https://arxiv.org/abs/1706.03762)
 - [ ] sentencepiece-based tokenizer
@@ -18,6 +18,7 @@ inspired by (minGPT)[https://github.com/karpathy/minGPT], i wanted to see if i c
 by Generative Pre-Training*](https://s3-us-west-2.amazonaws.com/openai-assets/research-covers/language-unsupervised/language_understanding_paper.pdf)
 - [ ] BERT-style encoder and example, from [*BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding*](https://arxiv.org/abs/1810.04805)
 - [ ] ALBERT-style encoder and example, from [*ALBERT: A Lite BERT for Self-supervised Learning of Language Representations*](https://arxiv.org/abs/1909.11942)
+- [ ] newer positional embeddings besides learned and sinusoidal
 
 ## how to use
 
