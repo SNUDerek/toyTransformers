@@ -8,13 +8,14 @@ class MultiHeadAttention(torch.nn.Module):
     """multi-head attention"""
     
     def __init__(self, d_in: int, d_attn: int, heads: int, 
-                 dropout: float=0.05, mask_temporal: bool=False,
+                 dropout: float=0.05, mask_temporal: bool=False, , mask_val=-10e8,
                  q_bias: bool=False, kv_bias: float=False, prj_bias: float=False):
         super().__init__()
         
         self.d_in = d_in
         self.d_attn = d_attn
         self.heads = heads
+        self.mask_val = mask_val
         self.dummy = torch.nn.Parameter(torch.empty(0))
         
         self.proj_q = torch.nn.Linear(self.d_in, self.d_attn * self.heads, bias=q_bias)
@@ -28,7 +29,7 @@ class MultiHeadAttention(torch.nn.Module):
         else:
             self.register_buffer("mask", torch.ones((1, l, l)).bool())
         
-    def forward(self, q, k, v, q_mask=None, kv_mask=None, mask_val=-1e8):
+    def forward(self, q, k, v, q_mask=None, kv_mask=None):
         device = self.dummy
         b, l, i = q.shape
         kb, kl, ki = k.shape
@@ -45,11 +46,11 @@ class MultiHeadAttention(torch.nn.Module):
         _qk = torch.matmul(_q, _k.transpose(-2, -1))/np.sqrt(self.d_attn)
         
         # apply padding and sequence masks
-        _qk = _qk.masked_fill(self.mask, mask_val)
+        _qk = _qk.masked_fill(self.mask, self.mask_val)
         if q_mask is not None:
-            _qk = _qk.masked_fill(q_mask.unsqueeze(1).unsqueeze(-1), mask_val)
+            _qk = _qk.masked_fill(q_mask.unsqueeze(1).unsqueeze(-1), self.mask_val)
         if kv_mask is not None:
-            _qk = _qk.masked_fill(kv_mask.unsqueeze(1).unsqueeze(1), mask_val)
+            _qk = _qk.masked_fill(kv_mask.unsqueeze(1).unsqueeze(1), self.mask_val)
         scores = torch.nn.functional.softmax(_qk, dim=-1)
         _attn = torch.matmul(self.dropout(scores), _v)
         

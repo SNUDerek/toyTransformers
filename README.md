@@ -2,6 +2,10 @@
 
 basic implementations of transformer model(s) for my own study
 
+## about
+
+inspired by (minGPT)[https://github.com/karpathy/minGPT], i wanted to see if i could implement some basic transformer models "from scratch" by following the original papers. this is a purely academic challenge for myself, a practicum of sorts for my study of transformers, and this code is not intended to be suitable for any real-world applications. while i am trying to adhere to the original papers as my primary reference, i am checking my code against other implementations to ensure that i am not totally off-base, and modifying it as necessary. that said, i do not guarantee the accuracy of my implementation, and any implementational errors are my own.
+
 ## current status & plans
 
 - [x] multi-head attention
