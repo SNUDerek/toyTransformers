@@ -7,11 +7,12 @@ from operator import iadd
 class MultiHeadAttention(torch.nn.Module):
     """multi-head attention"""
     
-    def __init__(self, d_in: int, d_attn: int, heads: int, 
-                 dropout: float=0.05, mask_temporal: bool=False, , mask_val=-10e8,
-                 q_bias: bool=False, kv_bias: float=False, prj_bias: float=False):
+    def __init__(self, seq_len: int, d_in: int, d_attn: int, heads: int,
+                 dropout: float=0.05, mask_temporal: bool=False, mask_val=-10e8,
+                 q_bias: bool=False, kv_bias: float=False, out_bias: float=False):
         super().__init__()
         
+        self.seq_len = seq_len
         self.d_in = d_in
         self.d_attn = d_attn
         self.heads = heads
@@ -21,13 +22,13 @@ class MultiHeadAttention(torch.nn.Module):
         self.proj_q = torch.nn.Linear(self.d_in, self.d_attn * self.heads, bias=q_bias)
         self.proj_k = torch.nn.Linear(self.d_in, self.d_attn * self.heads, bias=kv_bias)
         self.proj_v = torch.nn.Linear(self.d_in, self.d_attn * self.heads, bias=kv_bias)
-        self.proj_o = torch.nn.Linear(self.heads * self.d_attn, self.d_in, bias=prj_bias)
+        self.proj_o = torch.nn.Linear(self.heads * self.d_attn, self.d_in, bias=out_bias)
         self.dropout = torch.nn.Dropout(dropout)
         
         if mask_temporal:
-            self.register_buffer("mask", torch.triu(torch.ones((1, l, l)), diagonal=1).bool())
+            self.register_buffer("mask", torch.triu(torch.ones((1, self.seq_len, self.seq_len)), diagonal=1).bool())
         else:
-            self.register_buffer("mask", torch.ones((1, l, l)).bool())
+            self.register_buffer("mask", torch.ones((1, self.seq_len, self.seq_len)).bool())
         
     def forward(self, q, k, v, q_mask=None, kv_mask=None):
         device = self.dummy
@@ -64,17 +65,20 @@ class MultiHeadAttention(torch.nn.Module):
 class PositionWiseFeedForward(torch.nn.Module):
     """position-wise FFNN"""
     
-    def __init__(self, d_in: int, d_ffn: int, activation="relu"):
+    def __init__(self, d_in: int, d_ffn: int, activation: str="relu", dropout: float=0.0):
         super().__init__()
         self.linear1 = torch.nn.Linear(d_in, d_ffn)
+        self.dropout = torch.nn.Dropout(dropout)
         self.linear2 = torch.nn.Linear(d_ffn, d_in)
         if activation.lower() == "relu":
-            self.activation = torch.nn.ReLU
+            self.activation = torch.nn.ReLU()
         elif activation.lower() == "selu":
-            self.activation = torch.nn.SELU
+            self.activation = torch.nn.SELU()
+        elif activation.lower() == "gelu":
+            self.activation = torch.nn.GELU()
         
     def forward(self, x):
-        x = self.linear2(self.activation(self.linear1(x)))
+        x = self.linear2(self.activation(self.dropout(self.linear1(x))))
         return x
 
 
