@@ -20,6 +20,17 @@ by Generative Pre-Training*](https://s3-us-west-2.amazonaws.com/openai-assets/re
 - [ ] ALBERT-style encoder and example, from [*ALBERT: A Lite BERT for Self-supervised Learning of Language Representations*](https://arxiv.org/abs/1909.11942)
 - [ ] newer positional embeddings besides learned and sinusoidal
 
+## environment
+
+this is being developed with the following environment:
+
+- `python 3.7.11`
+- `pytorch 1.7.1` for `cuda 11.0`
+
+training is done on a `GTX 2080Ti`
+
+see `requirements.txt` for other required packages
+
 ## how to use
 
 todo later
