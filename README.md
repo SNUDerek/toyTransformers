@@ -11,7 +11,7 @@ inspired by [minGPT](https://github.com/karpathy/minGPT), i wanted to implement 
 - [x] multi-head attention
 - [x] sinusoidal positional encoding
 - [x] basic transformer encoder, from [*Attention is All You Need*](https://arxiv.org/abs/1706.03762)
-- [ ] basic transformer decoder, from [*Attention is All You Need*](https://arxiv.org/abs/1706.03762)
+- [x] basic transformer decoder, from [*Attention is All You Need*](https://arxiv.org/abs/1706.03762)
 - [ ] sentencepiece-based tokenizer
 - [ ] all above tested with basic seq2seq training and generation scripts (translation task)
 - [ ] GPT-style decoder and example, from [*Improving Language Understanding

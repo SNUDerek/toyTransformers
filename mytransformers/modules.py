@@ -8,7 +8,7 @@ class MultiHeadAttention(torch.nn.Module):
     """multi-head attention"""
     
     def __init__(self, seq_len: int, d_in: int, d_attn: int, heads: int,
-                 dropout: float=0.05, mask_temporal: bool=False, mask_val=-10e8,
+                 dropout: float=0.05, causal: bool=False, mask_val=-10e8,
                  q_bias: bool=False, kv_bias: float=False, out_bias: float=False):
         super().__init__()
         
@@ -25,7 +25,7 @@ class MultiHeadAttention(torch.nn.Module):
         self.proj_o = torch.nn.Linear(self.heads * self.d_attn, self.d_in, bias=out_bias)
         self.dropout = torch.nn.Dropout(dropout)
         
-        if mask_temporal:
+        if causal:
             self.register_buffer("mask", torch.triu(torch.ones((1, self.seq_len, self.seq_len)), diagonal=1).bool())
         else:
             self.register_buffer("mask", torch.ones((1, self.seq_len, self.seq_len)).bool())
