@@ -12,7 +12,30 @@ class SentencePieceTokenizer:
         self.sp = None
     
     
-    def fit(self, text_list, vocab_size=8000, control_symbols="[CLS],[SEP],[NEW]", **kwargs):
+    def fit(self, iterable, vocab_size=8000, control_symbols="[CLS],[SEP],[NEW1],[NEW2],[NEW3]", **kwargs):
+        """fit a sentencepiece model on sentence data iterable"""
+        try:
+            _ = iter(iterable)
+        except TypeError as e:
+            print('data is not iterable')
+            
+        _model = io.BytesIO()
+        
+        spm.SentencePieceTrainer.train(sentence_iterator=iter(iterable), 
+                                       model_writer=_model,
+                                       vocab_size=vocab_size, 
+                                       pad_id=0, unk_id=1, bos_id=2, eos_id=3,
+                                       pad_piece="[PAD]", unk_piece="[UNK]", bos_piece="[BOS]", eos_piece="[EOS]",
+                                       control_symbols=control_symbols.split(","),
+                                       **kwargs
+                                      )
+
+        self.sp = spm.SentencePieceProcessor(model_proto=_model.getvalue())
+        
+        return sp.vocab_size()
+    
+    
+    def fit_on_files(self, text_list, vocab_size=8000, control_symbols="[CLS],[SEP],[NEW]", **kwargs):
         """fit a sentencepiece model to one or more sentence-segmented raw text files"""
         if type(text_list) is not list:
             text_list = [text_list]
@@ -32,6 +55,8 @@ class SentencePieceTokenizer:
 
         self.sp = spm.SentencePieceProcessor(model_proto=_model.getvalue())
         
+        return sp.vocab_size()
+    
         
     def transform(self, texts, as_array=True, bos=False, eos=False, max_len=None):
         """transform one or more texts into zero-padded arrays"""

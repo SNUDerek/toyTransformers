@@ -36,7 +36,7 @@ class TransformerEncoderLayer(torch.nn.Module):
         
         self.mha = MultiHeadAttention(seq_len, d_in, d_attn, attn_heads, 
                                       dropout=attn_dropout, 
-                                      mask_temporal=False,
+                                      causal=False,
                                       mask_val=attn_mask_val, 
                                       q_bias=attn_q_bias,
                                       kv_bias=attn_kv_bias,
@@ -50,14 +50,14 @@ class TransformerEncoderLayer(torch.nn.Module):
         self.layer_norm_2 = torch.nn.LayerNorm(d_in)
         
         
-    def forward(self, x, x_lens=None):
+    def forward(self, x, seq_lens=None):
         
         assert x.shape[1] == self.seq_len
         assert x.shape[2] == self.d_in
         
         # create 2D mask from lengths
-        if x_lens is not None:
-            pad_mask = get_mask_from_lengths(x_lens, x.shape[0], x.device)
+        if seq_lens is not None:
+            pad_mask = get_mask_from_lengths(seq_lens, x.shape[1], x.device)
         else:
             pad_mask = torch.ones(x.shape[0], x.shape[1]).bool().to(x.device)
             
@@ -142,7 +142,7 @@ class TransformerDecoderLayer(torch.nn.Module):
         self.layer_norm_2 = torch.nn.LayerNorm(d_in)
         
         
-    def forward(self, x, mem, x_lens=None, mem_lens=None):
+    def forward(self, mem, x, mem_lens=None, seq_lens=None):
         
         assert x.shape[1] == self.seq_len
         assert x.shape[2] == self.d_in
@@ -150,12 +150,12 @@ class TransformerDecoderLayer(torch.nn.Module):
         assert mem.shape[2] == self.d_in
         
         # create 2D mask from lengths
-        if x_lens is not None:
-            pad_mask = get_mask_from_lengths(x_lens, x.shape[0], x.device)
+        if seq_lens is not None:
+            pad_mask = get_mask_from_lengths(seq_lens, x.shape[1], x.device)
         else:
             pad_mask = torch.ones(x.shape[0], x.shape[1]).bool().to(x.device)
         if mem_lens is not None:
-            mem_pad_mask = get_mask_from_lengths(mem_lens, x.shape[0], x.device)
+            mem_pad_mask = get_mask_from_lengths(mem_lens, x.shape[1], x.device)
         else:
             mem_pad_mask = torch.ones(x.shape[0], x.shape[1]).bool().to(x.device)
             

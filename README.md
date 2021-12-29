@@ -1,6 +1,6 @@
 # basic transformers
 
-basic implementations of transformer model(s) for my own study
+basic implementations of transformer model(s) for my own study.
 
 ## about
 
@@ -10,9 +10,10 @@ inspired by [minGPT](https://github.com/karpathy/minGPT), i wanted to implement 
 
 - [x] multi-head attention
 - [x] sinusoidal positional encoding
-- [x] basic transformer encoder, from [*Attention is All You Need*](https://arxiv.org/abs/1706.03762)
-- [x] basic transformer decoder, from [*Attention is All You Need*](https://arxiv.org/abs/1706.03762)
+- [x] basic transformer encoder layer, from [*Attention is All You Need*](https://arxiv.org/abs/1706.03762)
+- [x] basic transformer decoder layer, from [*Attention is All You Need*](https://arxiv.org/abs/1706.03762)
 - [x] sentencepiece-based tokenizer
+- [x] transformer seq2seq model, from [*Attention is All You Need*](https://arxiv.org/abs/1706.03762)
 - [ ] all above tested with basic seq2seq training and generation scripts (translation task)
 - [ ] GPT-style decoder and example, from [*Improving Language Understanding
 by Generative Pre-Training*](https://s3-us-west-2.amazonaws.com/openai-assets/research-covers/language-unsupervised/language_understanding_paper.pdf)
@@ -35,11 +36,14 @@ see `requirements.txt` for other required packages
 
 ### tokenizer
 
-the `SentencePieceTokenizer` tokenizer is a pickleable (tested with `dill`) class that wraps sentencepiece. it has `fit()`, `transform()` and `inverse_transform()` methods for fitting on one or more sentence-split text file(s), transforming a list of string inputs to padded numpy arrays and array of lengths, and transforming numpy arrays of indexed tokens back into text or readable tokens.
+the `SentencePieceTokenizer` tokenizer is a pickleable (tested with `dill`) class that wraps sentencepiece. it has `fit()`, `fit_on_files()`, `transform()` and `inverse_transform()` methods for fitting on a list of sentences or on one or more sentence-split text file(s), transforming a list of string inputs to padded numpy arrays and array of lengths, and transforming numpy arrays of indexed tokens back into text or readable tokens.
 
 ```
 >>> tokenizer = SentencePieceTokenizer()
->>> tokenizer.fit(["data/aeneid.txt", "data/iliad.txt", "data/odyssey.txt"], vocab_size=12000, character_coverage=0.9999)
+>>> tokenizer.fit_on_files(["data/aeneid.txt", "data/iliad.txt", "data/odyssey.txt"], vocab_size=12000, character_coverage=0.9999)
+
+8000
+
 >>> ids, lens = tokenizer.transform(lines[:8], max_len=100, as_array=True)
 >>> print(type(ids).__name__, ids.shape)
 
