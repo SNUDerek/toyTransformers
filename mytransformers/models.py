@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 
+from mytransformers.modules import SinusoidalPositionalEncoding
 from mytransformers.layers import TransformerEncoderLayer
 from mytransformers.layers import TransformerDecoderLayer
 
@@ -35,6 +36,9 @@ class TransformerModel(torch.nn.Module):
                  pre_ln: bool=False
                 ):
         super().__init__()
+        
+        # positional encoding
+        self.positional_encoding = SinusoidalPositionalEncoding()
         
         # vocabulary embedding layer(s)
         self.shared_vocab = shared_vocab
@@ -106,6 +110,7 @@ class TransformerModel(torch.nn.Module):
         # encode inputs
         x = self.embedding(x)
         x = self.proj_to(x)
+        x = self.positional_encoding(x)
         for enc_lyr in self.encoder_layers:
             x = enc_lyr(x, seq_lens=x_lens)
         
@@ -118,6 +123,7 @@ class TransformerModel(torch.nn.Module):
             _prj = self.tgt_proj_to
         y = _emb(y_in)
         y = _prj(y)
+        y = self.positional_encoding(y)
         for dec_lyr in self.decoder_layers:
             x = dec_lyr(x, y, mem_lens=x_lens, seq_lens=y_lens)
         
