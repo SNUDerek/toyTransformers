@@ -1,6 +1,10 @@
-# basic transformers
+# reproduction transformers
 
-basic implementations of transformer model(s) for my own study.
+me: can we have Transformers?
+
+mom: no, we have Transformers at home.
+
+Transformers at home:
 
 ## about
 
