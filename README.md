@@ -33,7 +33,45 @@ see `requirements.txt` for other required packages
 
 ## how to use
 
-todo later
+### tokenizer
+
+the `SentencePieceTokenizer` tokenizer is a pickleable (tested with `dill`) class that wraps sentencepiece. it has `fit()`, `transform()` and `inverse_transform()` methods for fitting on one or more sentence-split text file(s), transforming a list of string inputs to padded numpy arrays and array of lengths, and transforming numpy arrays of indexed tokens back into text or readable tokens.
+
+```
+>>> tokenizer = SentencePieceTokenizer()
+>>> tokenizer.fit(["data/aeneid.txt", "data/iliad.txt", "data/odyssey.txt"], vocab_size=12000, character_coverage=0.9999)
+>>> ids, lens = tokenizer.transform(lines[:8], max_len=100, as_array=True)
+>>> print(type(ids).__name__, ids.shape)
+
+ndarray (8, 100)
+
+>>> tokenizer.inverse_transform(ids)
+
+['BOOK I',
+ 'THE LANDING NEAR CARTHAGE',
+ 'Arms and the man I sing, the first who came,',
+ 'Compelled by fate, an exile out of Troy,',
+ 'To Italy and the Lavinian coast,',
+ 'Much buffeted on land and on the deep',
+ 'By violence of the gods, through that long rage,',
+ 'That lasting hate, of Juno’s. And he suffered']
+ 
+>>> tokenizer.export_model("data/_test.model")
+
+True
+
+>>> tokenizer2.load_model("data/_test.model")
+>>> tokenizer2.tokenize_as_string(["hello, world!", "this is a test"])
+
+[['▁hell', 'o', ',', '▁world', '!'], ['▁this', '▁is', '▁a', '▁test']]
+
+>>> pickle.dump(tokenizer, open("data/test.tokenizer", "wb"))
+>>> tokenizer3 = pickle.load(open("data/test.tokenizer", "rb"))
+>>> tokenizer3.tokenize_as_string(["hello, world!", "this is a test"])
+
+[['▁hell', 'o', ',', '▁world', '!'], ['▁this', '▁is', '▁a', '▁test']]
+
+```
 
 ## references
 
