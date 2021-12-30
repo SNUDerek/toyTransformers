@@ -49,19 +49,21 @@ class TransformerModel(torch.nn.Module):
                 self.config[key] = values[key]
         super().__init__()
         
+        self.shared_vocab = shared_vocab
+        self.seq_len = seq_len
+        self.d_in = d_in
+        
         self.dropout = torch.nn.Dropout(dropout)
         
         # positional encoding
         if pos_encoding == "sinusoidal":
             self.positional_encoding = SinusoidalPositionalEncoding()
         elif pos_encoding == "learned":
-            self.positional_encoding = LearnedPositionalEncoding()
+            self.positional_encoding = LearnedPositionalEncoding(self.seq_len, self.d_in)
         else:
             raise ValueError("'pos_encoding' must be in ('sinusoidal', 'learned')!")
         
         # vocabulary embedding layer(s)
-        self.shared_vocab = shared_vocab
-        self.seq_len = seq_len
         if d_vocab != d_in:
             self.proj_to = torch.nn.Linear(d_vocab, d_in)
             self.proj_from = torch.nn.Linear(d_in, d_vocab)
@@ -164,6 +166,7 @@ class TransformerModel(torch.nn.Module):
         y = torch.matmul(y, w_T)
         
         return y
+    
     
     def infer_one_greedy(self, x, x_lens, bos=2, eos=3, verbose=False):
         

@@ -48,12 +48,13 @@ class MultiHeadAttention(torch.nn.Module):
         
         # apply padding and sequence masks
         _qk = _qk.masked_fill(self.mask, self.mask_val)
+        _qk = self.dropout(_qk)
         if q_mask is not None:
             _qk = _qk.masked_fill(q_mask.unsqueeze(1).unsqueeze(-1), self.mask_val)
         if kv_mask is not None:
             _qk = _qk.masked_fill(kv_mask.unsqueeze(1).unsqueeze(1), self.mask_val)
         scores = torch.nn.functional.softmax(_qk, dim=-1)
-        _attn = torch.matmul(self.dropout(scores), _v)
+        _attn = torch.matmul(scores, _v)
         
         # transpose to (b, l, h, d_attn), reshape to (b, l, h*d_attn), project to (b, l, d_in)
         _attn = torch.reshape(_attn.transpose(1, 2), (b, l, self.heads * self.d_attn))
@@ -114,6 +115,7 @@ class SinusoidalPositionalEncoding(torch.nn.Module):
         denominator = 1. / (10000 ** (torch.arange(0, d, 2).float() / d)).to(device)    # denominator of inner term
         pos_encoding[:, 0::2] = torch.sin(pos_encoding[:, 0::2] * denominator)  # apply sine to every other
         pos_encoding[:, 1::2] = torch.cos(pos_encoding[:, 1::2] * denominator)  # apply cosine to every other
+        embeddings *= np.sqrt(embeddings.shape[-1])  # from "Attention..." 3.4
         embeddings += pos_encoding.unsqueeze(0).repeat(b, 1, 1)
         
         return embeddings
