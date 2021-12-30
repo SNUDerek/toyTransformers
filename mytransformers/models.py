@@ -173,7 +173,7 @@ class TransformerModel(torch.nn.Module):
         # dummy input
         y_in = torch.zeros_like(x).long().to(x.device)
         y_in[0][0] = bos
-        y_lens = None
+        y_lens = torch.from_numpy(np.array([[1]])).long().to(x.device)
         
         # encode inputs
         x = self.embedding(x)
@@ -213,6 +213,7 @@ class TransformerModel(torch.nn.Module):
             y_p = torch.nn.functional.softmax(y, dim=-1)
             next_token = torch.argmax(y_p[0][i])
             y_in[0][i+1] = torch.argmax(y_p[0][i])
+            y_lens[0][0] += 1
             if next_token == eos:
                 break
 
