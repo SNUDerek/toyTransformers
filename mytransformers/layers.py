@@ -22,7 +22,7 @@ class TransformerEncoderLayer(torch.nn.Module):
                  attn_heads: int, 
                  attn_dropout: float, 
                  ffnn_dropout: float,
-                 attn_mask_val: float=-10e8, 
+                 attn_mask_val: float=-1e08, 
                  attn_q_bias: bool=False, 
                  attn_kv_bias: bool=False, 
                  attn_out_bias: bool=False, 
@@ -76,14 +76,14 @@ class TransformerEncoderLayer(torch.nn.Module):
         # positionwise FFNN sub-block
         if self.pre_ln:
             residual = x
-            x = self.layer_norm_1(x)
+            x = self.layer_norm_2(x)
             x = self.ffnn(x)
             x += residual
         else:
             residual = x
             x = self.ffnn(x)
             x += residual
-            x = self.layer_norm_1(x)
+            x = self.layer_norm_2(x)
 
         return x
     
@@ -103,7 +103,7 @@ class TransformerDecoderLayer(torch.nn.Module):
                  attn_heads: int, 
                  attn_dropout: float, 
                  ffnn_dropout: float,
-                 attn_mask_val: float=-10e8, 
+                 attn_mask_val: float=-1e08, 
                  attn_q_bias: bool=False, 
                  attn_kv_bias: bool=False, 
                  attn_out_bias: bool=False, 
@@ -139,7 +139,7 @@ class TransformerDecoderLayer(torch.nn.Module):
         
         self.layer_norm_1 = torch.nn.LayerNorm(d_in)
         self.layer_norm_2 = torch.nn.LayerNorm(d_in)
-        self.layer_norm_2 = torch.nn.LayerNorm(d_in)
+        self.layer_norm_3 = torch.nn.LayerNorm(d_in)
         
         
     def forward(self, mem, x, mem_lens=None, seq_lens=None):
@@ -159,7 +159,7 @@ class TransformerDecoderLayer(torch.nn.Module):
         else:
             mem_pad_mask = torch.ones(x.shape[0], x.shape[1]).bool().to(x.device)
             
-        # causal self -attention sub-block
+        # causal self-attention sub-block
         if self.pre_ln:
             residual = x
             x = self.layer_norm_1(x)
@@ -174,25 +174,25 @@ class TransformerDecoderLayer(torch.nn.Module):
         # memory attention
         if self.pre_ln:
             residual = x
-            x = self.layer_norm_1(x)
-            _, x = self.masked_mha(x, mem, mem, q_mask=pad_mask, kv_mask=mem_pad_mask)
+            x = self.layer_norm_2(x)
+            _, x = self.mha(x, mem, mem, q_mask=pad_mask, kv_mask=mem_pad_mask)
             x += residual
         else:
             residual = x
-            _, x = self.masked_mha(x, mem, mem, q_mask=pad_mask, kv_mask=mem_pad_mask)
+            _, x = self.mha(x, mem, mem, q_mask=pad_mask, kv_mask=mem_pad_mask)
             x += residual
-            x = self.layer_norm_1(x)
+            x = self.layer_norm_2(x)
             
         # positionwise FFNN sub-block
         if self.pre_ln:
             residual = x
-            x = self.layer_norm_1(x)
+            x = self.layer_norm_3(x)
             x = self.ffnn(x)
             x += residual
         else:
             residual = x
             x = self.ffnn(x)
             x += residual
-            x = self.layer_norm_1(x)
+            x = self.layer_norm_3(x)
 
         return x

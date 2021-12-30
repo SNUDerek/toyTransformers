@@ -33,7 +33,7 @@ class TransformerModel(torch.nn.Module):
                  ffnn_dropout: float=0.0,
                  pos_encoding: str="sinusoidal",
                  shared_vocab: bool=False,
-                 attn_mask_val: float=-10e8, 
+                 attn_mask_val: float=-1e08, 
                  attn_q_bias: bool=False, 
                  attn_kv_bias: bool=False, 
                  attn_out_bias: bool=False, 
@@ -57,7 +57,7 @@ class TransformerModel(torch.nn.Module):
         
         # positional encoding
         if pos_encoding == "sinusoidal":
-            self.positional_encoding = SinusoidalPositionalEncoding()
+            self.positional_encoding = SinusoidalPositionalEncoding(self.seq_len, self.d_in)
         elif pos_encoding == "learned":
             self.positional_encoding = LearnedPositionalEncoding(self.seq_len, self.d_in)
         else:

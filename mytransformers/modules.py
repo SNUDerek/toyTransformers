@@ -91,32 +91,26 @@ class LearnedPositionalEncoding(torch.nn.Module):
         torch.nn.init.xavier_normal_(self.learned_embeddings)
 
     def forward(self, embeddings):
-        b, l, d = embeddings.shape
-        device = embeddings.device
-        
         # create positional encoding
         embeddings *= np.sqrt(embeddings.shape[-1])  # from "Attention..." 3.4
-        embeddings += self.learned_embeddings.unsqueeze(0).repeat(b, 1, 1)
+        embeddings += self.learned_embeddings.unsqueeze(0).repeat(embeddings.shape[0], 1, 1)
         
         return embeddings
     
 
 class SinusoidalPositionalEncoding(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, seq_len, d_in):
         super().__init__()
-
-
-    def forward(self, embeddings):
-        b, l, d = embeddings.shape
-        device = embeddings.device
-        
         # create positional encoding
-        pos_encoding = torch.arange(0, l).unsqueeze(1).repeat(1, d).float().to(device)  # index each step
-        denominator = 1. / (10000 ** (torch.arange(0, d, 2).float() / d)).to(device)    # denominator of inner term
-        pos_encoding[:, 0::2] = torch.sin(pos_encoding[:, 0::2] * denominator)  # apply sine to every other
-        pos_encoding[:, 1::2] = torch.cos(pos_encoding[:, 1::2] * denominator)  # apply cosine to every other
+        _pos_encoding = torch.arange(0, seq_len).unsqueeze(1).repeat(1, d_in).float()  # index each step
+        denominator = 1. / (10000 ** (torch.arange(0, d_in, 2).float() / d_in))        # denominator of inner term
+        _pos_encoding[:, 0::2] = torch.sin(_pos_encoding[:, 0::2] * denominator)  # apply sine to every other
+        _pos_encoding[:, 1::2] = torch.cos(_pos_encoding[:, 1::2] * denominator)  # apply cosine to every other
+        self.register_buffer("pos_encoding", _pos_encoding)
+        
+    def forward(self, embeddings):
         embeddings *= np.sqrt(embeddings.shape[-1])  # from "Attention..." 3.4
-        embeddings += pos_encoding.unsqueeze(0).repeat(b, 1, 1)
+        embeddings += self.pos_encoding.unsqueeze(0).repeat(embeddings.shape[0], 1, 1)
         
         return embeddings
     
