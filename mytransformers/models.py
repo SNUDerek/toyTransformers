@@ -1,6 +1,7 @@
 import inspect
 import numpy as np
 import torch
+import tqdm
 
 from mytransformers.modules import LearnedPositionalEncoding
 from mytransformers.modules import SinusoidalPositionalEncoding
@@ -163,3 +164,53 @@ class TransformerModel(torch.nn.Module):
         y = torch.matmul(y, w_T)
         
         return y
+    
+    def infer_one_greedy(self, x, x_lens, bos=2, eos=3, verbose=False):
+        
+        # dummy input
+        y_in = torch.zeros_like(x).long().to(x.device)
+        y_in[0][0] = bos
+        y_lens = None
+        
+        # encode inputs
+        x = self.embedding(x)
+        x = self.proj_to(x)
+        x = self.positional_encoding(x)
+        for enc_lyr in self.encoder_layers:
+            x = enc_lyr(x, seq_lens=x_lens)
+
+        rng = tqdm.trange(self.seq_len-1) if verbose else range(self.seq_len-1)
+            
+        for i in rng:
+
+            # decoder with shifted inputs
+            if self.shared_vocab:
+                _emb = self.embedding
+                _prj = self.proj_to
+            else:
+                _emb = self.tgt_embedding
+                _prj = self.tgt_proj_to
+            y = _emb(y_in)
+            y = _prj(y)
+            y = self.positional_encoding(y)
+            y = self.dropout(y)
+            for dec_lyr in self.decoder_layers:
+                y = dec_lyr(x, y, mem_lens=x_lens, seq_lens=y_lens)
+                y = self.dropout(y)
+
+            # vocabulary projection with weight tying
+            y = self.proj_from(y)
+            if self.shared_vocab:
+                w_T = self.embedding.weight.t()
+            else:
+                w_T = self.tgt_embedding.weight.t()
+            y = torch.matmul(y, w_T)
+
+            # get next predicted token by softmax
+            y_p = torch.nn.functional.softmax(y, dim=-1)
+            next_token = torch.argmax(y_p[0][i])
+            y_in[0][i+1] = torch.argmax(y_p[0][i])
+            if next_token == eos:
+                break
+
+        return y_in[0].detach().cpu().numpy().tolist()
