@@ -1,3 +1,4 @@
 dill>=0.3.4
 numpy>=1.19.5
 sentencepiece>=0.1.96
+tqdm

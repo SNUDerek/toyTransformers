@@ -8,7 +8,7 @@ class MultiHeadAttention(torch.nn.Module):
     """multi-head attention"""
     
     def __init__(self, seq_len: int, d_in: int, d_attn: int, heads: int,
-                 dropout: float=0.05, causal: bool=False, mask_val=-10e8,
+                 dropout: float=0.0, causal: bool=False, mask_val=-10e8,
                  q_bias: bool=False, kv_bias: float=False, out_bias: float=False):
         super().__init__()
         

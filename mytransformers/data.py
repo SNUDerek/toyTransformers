@@ -1,8 +1,23 @@
-import dill as pickle
 import fileinput
 import io
 import numpy as np
 import sentencepiece as spm
+import torch
+
+
+def pad_to_seq_len(batch, max_seq_len):
+    """batch variable-length sequences and right-zero-pad"""
+    x_list, y_list, x_len_list, y_len_list = list(zip(*batch))
+    x_len_list = [min(x, max_seq_len) for x in x_len_list]
+    y_len_list = [min(y, max_seq_len) for y in y_len_list]
+    x_array = np.array([np.pad(np.array(x[:max_seq_len]), (0, max_seq_len-len(x))) for x in x_list])
+    y_array = np.array([np.pad(np.array(y[:max_seq_len+1]), (0, max_seq_len-len(y)+1)) for y in y_list])
+    x_tensor = torch.from_numpy(x_array).long()
+    y_in_tensor = torch.from_numpy(y_array[:,:-1]).long()
+    y_out_tensor = torch.from_numpy(y_array[:,1:]).long()
+    x_lens_tensor = torch.from_numpy(np.array(x_len_list)).long()
+    y_lens_tensor = torch.from_numpy(np.array(y_len_list)).long()
+    return x_tensor, y_in_tensor, y_out_tensor, x_lens_tensor, y_lens_tensor
 
 
 class SentencePieceTokenizer:
@@ -32,7 +47,7 @@ class SentencePieceTokenizer:
 
         self.sp = spm.SentencePieceProcessor(model_proto=_model.getvalue())
         
-        return sp.vocab_size()
+        return self.sp.vocab_size()
     
     
     def fit_on_files(self, text_list, vocab_size=8000, control_symbols="[CLS],[SEP],[NEW]", **kwargs):
@@ -55,7 +70,7 @@ class SentencePieceTokenizer:
 
         self.sp = spm.SentencePieceProcessor(model_proto=_model.getvalue())
         
-        return sp.vocab_size()
+        return self.sp.vocab_size()
     
         
     def transform(self, texts, as_array=True, bos=False, eos=False, max_len=None):
@@ -122,4 +137,60 @@ class SentencePieceTokenizer:
         return True
     
     
+class SimpleTranslationDataset(torch.utils.data.Dataset):
+    """Face Landmarks dataset."""
 
+    def __init__(self, csv_filepath, src_tokenizer=None, tgt_tokenizer=None, share_tokenizer=False, sep="\t", verbose=True, **kwargs):
+        """simple dataset for translation"""
+        self.share_tokenizer = share_tokenizer
+        self.source = []
+        self.target = []
+        with open(csv_filepath) as f:
+            lines = f.read().split("\n")
+        for line in lines:
+            s, t = line.split(sep)
+            if len(s) > 0 and len(t) > 0:
+                self.source.append(s)
+                self.target.append(t)
+        if src_tokenizer is None:
+            if verbose: print("fitting tokenizer...")
+            if self.share_tokenizer:
+                self.src_tokenizer = SentencePieceTokenizer()
+                _ = self.src_tokenizer.fit(self.source + self.target, **kwargs)
+            else:
+                if verbose: print("fitting source tokenizer...")
+                self.src_tokenizer = SentencePieceTokenizer()
+                _ = self.src_tokenizer.fit(self.source, **kwargs)
+                if tgt_tokenizer is None:
+                    if verbose: print("fitting target tokenizer...")
+                    self.tgt_tokenizer = SentencePieceTokenizer()
+                    _ = self.tgt_tokenizer.fit(self.target, **kwargs)
+        else:
+            self.src_tokenizer = src_tokenizer
+            if tgt_tokenizer is None:
+                if verbose: print("fitting target tokenizer...")
+                self.tgt_tokenizer = SentencePieceTokenizer()
+                _ = self.tgt_tokenizer.fit(self.target, **kwargs)
+            else:
+                self.tgt_tokenizer = tgt_tokenizer
+                    
+                    
+    def get_tokenizers(self):
+                    
+        return self.src_tokenizer, self.tgt_tokenizer
+                    
+        
+    def __len__(self):
+        return len(self.source)
+    
+
+    def __getitem__(self, idx):
+
+        if self.share_tokenizer:
+            x, x_len = self.src_tokenizer.transform(self.source[idx], as_array=False, bos=True, eos=True)
+            y, y_len = self.src_tokenizer.transform(self.target[idx], as_array=False, bos=True, eos=True)
+        else:
+            x, x_len = self.src_tokenizer.transform(self.source[idx], as_array=False, bos=True, eos=True)
+            y, y_len = self.tgt_tokenizer.transform(self.target[idx], as_array=False, bos=True, eos=True)
+
+        return x[0], y[0], x_len[0], y_len[0]

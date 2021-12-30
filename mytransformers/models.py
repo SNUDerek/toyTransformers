@@ -27,8 +27,9 @@ class TransformerModel(torch.nn.Module):
                  d_attn: int, 
                  d_ffnn: int, 
                  attn_heads: int, 
-                 attn_dropout: float, 
-                 ffnn_dropout: float,
+                 dropout: float=0.1,
+                 attn_dropout: float=0.0, 
+                 ffnn_dropout: float=0.0,
                  pos_encoding: str="sinusoidal",
                  shared_vocab: bool=False,
                  attn_mask_val: float=-10e8, 
@@ -46,6 +47,8 @@ class TransformerModel(torch.nn.Module):
             if key != 'self':
                 self.config[key] = values[key]
         super().__init__()
+        
+        self.dropout = torch.nn.Dropout(dropout)
         
         # positional encoding
         if pos_encoding == "sinusoidal":
@@ -131,8 +134,10 @@ class TransformerModel(torch.nn.Module):
         x = self.embedding(x)
         x = self.proj_to(x)
         x = self.positional_encoding(x)
+        x = self.dropout(x)
         for enc_lyr in self.encoder_layers:
             x = enc_lyr(x, seq_lens=x_lens)
+            x = self.dropout(x)
         
         # decoder with shifted inputs
         if self.shared_vocab:
@@ -144,8 +149,10 @@ class TransformerModel(torch.nn.Module):
         y = _emb(y_in)
         y = _prj(y)
         y = self.positional_encoding(y)
+        y = self.dropout(y)
         for dec_lyr in self.decoder_layers:
-            x = dec_lyr(x, y, mem_lens=x_lens, seq_lens=y_lens)
+            y = dec_lyr(x, y, mem_lens=x_lens, seq_lens=y_lens)
+            y = self.dropout(y)
         
         # vocabulary projection with weight tying
         y = self.proj_from(y)
