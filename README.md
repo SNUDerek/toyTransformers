@@ -1,10 +1,6 @@
-# reproduction transformers
+# toy transformers
 
-me: can we have Transformers?
-
-mom: no, we have Transformers at home.
-
-Transformers at home:
+(WIP) toy implementations of transformer models, for my own self-enlightenment.
 
 ## about
 

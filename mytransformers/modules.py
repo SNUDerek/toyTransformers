@@ -82,6 +82,24 @@ class PositionWiseFeedForward(torch.nn.Module):
         return x
 
 
+class LearnedPositionalEncoding(torch.nn.Module):
+    def __init__(self, seq_len, d_in):
+        super().__init__()
+        # learned embedding matrix for one sample
+        self.learned_embeddings = torch.nn.Parameter(torch.rand(seq_len, d_in).float())
+        torch.nn.init.xavier_normal_(self.learned_embeddings)
+
+    def forward(self, embeddings):
+        b, l, d = embeddings.shape
+        device = embeddings.device
+        
+        # create positional encoding
+        embeddings *= np.sqrt(embeddings.shape[-1])  # from "Attention..." 3.4
+        embeddings += self.learned_embeddings.unsqueeze(0).repeat(b, 1, 1)
+        
+        return embeddings
+    
+
 class SinusoidalPositionalEncoding(torch.nn.Module):
     def __init__(self):
         super().__init__()

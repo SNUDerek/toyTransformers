@@ -1,6 +1,8 @@
+import inspect
 import numpy as np
 import torch
 
+from mytransformers.modules import LearnedPositionalEncoding
 from mytransformers.modules import SinusoidalPositionalEncoding
 from mytransformers.layers import TransformerEncoderLayer
 from mytransformers.layers import TransformerDecoderLayer
@@ -27,6 +29,7 @@ class TransformerModel(torch.nn.Module):
                  attn_heads: int, 
                  attn_dropout: float, 
                  ffnn_dropout: float,
+                 pos_encoding: str="sinusoidal",
                  shared_vocab: bool=False,
                  attn_mask_val: float=-10e8, 
                  attn_q_bias: bool=False, 
@@ -35,10 +38,22 @@ class TransformerModel(torch.nn.Module):
                  ffnn_activation: str="relu", 
                  pre_ln: bool=False
                 ):
+        # save initial configuration
+        frame = inspect.currentframe()
+        keys, _, _, values = inspect.getargvalues(frame)
+        self.config = {}
+        for key in keys:
+            if key != 'self':
+                self.config[key] = values[key]
         super().__init__()
         
         # positional encoding
-        self.positional_encoding = SinusoidalPositionalEncoding()
+        if pos_encoding == "sinusoidal":
+            self.positional_encoding = SinusoidalPositionalEncoding()
+        elif pos_encoding == "learned":
+            self.positional_encoding = LearnedPositionalEncoding()
+        else:
+            raise ValueError("'pos_encoding' must be in ('sinusoidal', 'learned')!")
         
         # vocabulary embedding layer(s)
         self.shared_vocab = shared_vocab
@@ -104,7 +119,12 @@ class TransformerModel(torch.nn.Module):
             _decoder_layers.append(l)
         self.decoder_layers = torch.nn.ModuleList(_decoder_layers)
         
-
+    
+    def get_config(self):
+        
+        return self.config
+    
+    
     def forward(self, x, y_in, x_lens=None, y_lens=None):
 
         # encode inputs
