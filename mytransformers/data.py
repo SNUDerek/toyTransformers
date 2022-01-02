@@ -27,7 +27,7 @@ class SentencePieceTokenizer:
         self.sp = None
     
     
-    def fit(self, iterable, vocab_size=8000, control_symbols="[CLS],[SEP],[NEW1],[NEW2],[NEW3]", **kwargs):
+    def fit(self, iterable, vocab_size=8000, control_symbols="[CLS],[SEP],[MASK],[NEW1],[NEW2]", **kwargs):
         """fit a sentencepiece model on sentence data iterable"""
         try:
             _ = iter(iterable)

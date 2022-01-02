@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import tqdm
 
+from mytransformers.functions import get_mask_from_lengths
 from mytransformers.modules import LearnedPositionalEncoding
 from mytransformers.modules import SinusoidalPositionalEncoding
 from mytransformers.layers import TransformerEncoderLayer
@@ -48,12 +49,11 @@ class TransformerModel(torch.nn.Module):
             if key != 'self':
                 self.config[key] = values[key]
         super().__init__()
-        
+        self.src_vocab_sz = src_vocab_sz
+        self.tgt_vocab_sz = tgt_vocab_sz
         self.shared_vocab = shared_vocab
         self.seq_len = seq_len
         self.d_in = d_in
-        
-        self.dropout = torch.nn.Dropout(dropout)
         
         # positional encoding
         if pos_encoding == "sinusoidal":
@@ -64,21 +64,23 @@ class TransformerModel(torch.nn.Module):
             raise ValueError("'pos_encoding' must be in ('sinusoidal', 'learned')!")
         
         # vocabulary embedding layer(s)
+        self.embedding = torch.nn.Embedding(src_vocab_sz, d_vocab)
+        if not self.shared_vocab:
+            self.tgt_embedding = torch.nn.Embedding(tgt_vocab_sz, d_vocab)
+            
         if d_vocab != d_in:
-            self.proj_to = torch.nn.Linear(d_vocab, d_in)
-            self.proj_from = torch.nn.Linear(d_in, d_vocab)
+            self.proj_to = torch.nn.Linear(d_vocab, d_in, bias=False)
+            self.proj_from = torch.nn.Linear(d_in, d_vocab, bias=False)
             if not self.shared_vocab:
-                self.tgt_proj_to = torch.nn.Linear(d_vocab, d_in)
+                self.tgt_proj_to = torch.nn.Linear(d_vocab, d_in, bias=False)
         else:
             self.proj_to = torch.nn.Identity()
             self.proj_from = torch.nn.Identity()
             if not self.shared_vocab:
                 self.tgt_proj_to = torch.nn.Identity()
+                
+        self.dropout = torch.nn.Dropout(dropout)
 
-        self.embedding = torch.nn.Embedding(src_vocab_sz, d_vocab)
-        if not self.shared_vocab:
-            self.tgt_embedding = torch.nn.Embedding(tgt_vocab_sz, d_vocab)
-            
         # encoder layers
         _encoder_layers = []
         if enc_layers < 1:
@@ -141,14 +143,20 @@ class TransformerModel(torch.nn.Module):
         for enc_lyr in self.encoder_layers:
             x = enc_lyr(x, seq_lens=x_lens)
             x = self.dropout(x)
+        # zero-mask the padded indices
+        if x_lens is not None:
+            x_pad = get_mask_from_lengths(x_lens, self.seq_len, x.device)
+            x = torch.masked_fill(x, x_pad.unsqueeze(-1), 0.0)
         
         # decoder with shifted inputs
         if self.shared_vocab:
             _emb = self.embedding
             _prj = self.proj_to
+            _siz = self.src_vocab_sz
         else:
             _emb = self.tgt_embedding
             _prj = self.tgt_proj_to
+            _siz = self.tgt_vocab_sz
         y = _emb(y_in)
         y = _prj(y)
         y = self.positional_encoding(y)
@@ -160,10 +168,10 @@ class TransformerModel(torch.nn.Module):
         # vocabulary projection with weight tying
         y = self.proj_from(y)
         if self.shared_vocab:
-            w_T = self.embedding.weight.t()
+            w = self.embedding.weight
         else:
-            w_T = self.tgt_embedding.weight.t()
-        y = torch.matmul(y, w_T)
+            w = self.tgt_embedding.weight
+        y = torch.matmul(y, w.t())
         
         return y
     
@@ -173,7 +181,7 @@ class TransformerModel(torch.nn.Module):
         # dummy input
         y_in = torch.zeros_like(x).long().to(x.device)
         y_in[0][0] = bos
-        y_lens = torch.from_numpy(np.array([[1]])).long().to(x.device)
+        y_lens = torch.from_numpy(np.array([1])).long().to(x.device)
         
         # encode inputs
         x = self.embedding(x)
@@ -181,6 +189,10 @@ class TransformerModel(torch.nn.Module):
         x = self.positional_encoding(x)
         for enc_lyr in self.encoder_layers:
             x = enc_lyr(x, seq_lens=x_lens)
+        # zero-mask the padded indices
+        if x_lens is not None:
+            x_pad = get_mask_from_lengths(x_lens, self.seq_len, x.device)
+            x = x.masked_fill(x_pad.unsqueeze(-1), 0.0)
 
         rng = tqdm.trange(self.seq_len-1) if verbose else range(self.seq_len-1)
             
@@ -190,30 +202,30 @@ class TransformerModel(torch.nn.Module):
             if self.shared_vocab:
                 _emb = self.embedding
                 _prj = self.proj_to
+                _siz = self.src_vocab_sz
             else:
                 _emb = self.tgt_embedding
                 _prj = self.tgt_proj_to
+                _siz = self.tgt_vocab_sz
             y = _emb(y_in)
             y = _prj(y)
             y = self.positional_encoding(y)
-            y = self.dropout(y)
             for dec_lyr in self.decoder_layers:
                 y = dec_lyr(x, y, mem_lens=x_lens, seq_lens=y_lens)
-                y = self.dropout(y)
 
             # vocabulary projection with weight tying
             y = self.proj_from(y)
             if self.shared_vocab:
-                w_T = self.embedding.weight.t()
+                w = self.embedding.weight
             else:
-                w_T = self.tgt_embedding.weight.t()
-            y = torch.matmul(y, w_T)
+                w = self.tgt_embedding.weight
+            y = torch.matmul(y, w.t())
 
             # get next predicted token by softmax
             y_p = torch.nn.functional.softmax(y, dim=-1)
             next_token = torch.argmax(y_p[0][i])
-            y_in[0][i+1] = torch.argmax(y_p[0][i])
-            y_lens[0][0] += 1
+            y_in[0][i+1] = next_token
+            y_lens[0] += 1
             if next_token == eos:
                 break
 

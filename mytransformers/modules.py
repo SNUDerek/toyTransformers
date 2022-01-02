@@ -28,12 +28,14 @@ class MultiHeadAttention(torch.nn.Module):
         if causal:
             self.register_buffer("mask", torch.triu(torch.ones((1, self.seq_len, self.seq_len)), diagonal=1).bool())
         else:
-            self.register_buffer("mask", torch.ones((1, self.seq_len, self.seq_len)).bool())
+            self.register_buffer("mask", torch.zeros((1, self.seq_len, self.seq_len)).bool())
         
     def forward(self, q, k, v, q_mask=None, kv_mask=None):
         device = self.dummy
         b, l, i = q.shape
         kb, kl, ki = k.shape
+        vb, vl, vi = k.shape
+        assert kb == vb and kl == vl and ki == vi
         assert b == kb
         assert l == kl
         assert i == ki == self.d_in
@@ -47,8 +49,8 @@ class MultiHeadAttention(torch.nn.Module):
         _qk = torch.matmul(_q, _k.transpose(-2, -1))/np.sqrt(self.d_attn)
         
         # apply padding and sequence masks
-        _qk = _qk.masked_fill(self.mask, self.mask_val)
         _qk = self.dropout(_qk)
+        _qk = _qk.masked_fill(self.mask, self.mask_val)
         if q_mask is not None:
             _qk = _qk.masked_fill(q_mask.unsqueeze(1).unsqueeze(-1), self.mask_val)
         if kv_mask is not None:
@@ -56,7 +58,7 @@ class MultiHeadAttention(torch.nn.Module):
         scores = torch.nn.functional.softmax(_qk, dim=-1)
         _attn = torch.matmul(scores, _v)
         
-        # transpose to (b, l, h, d_attn), reshape to (b, l, h*d_attn), project to (b, l, d_in)
+        # transpose to (b, h, l, d_attn), reshape to (b, l, h*d_attn), project to (b, l, d_in)
         _attn = torch.reshape(_attn.transpose(1, 2), (b, l, self.heads * self.d_attn))
         output = self.proj_o(_attn)
         
