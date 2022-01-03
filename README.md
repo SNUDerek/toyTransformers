@@ -91,6 +91,8 @@ by Generative Pre-Training*](https://s3-us-west-2.amazonaws.com/openai-assets/re
 ### reference implementations and articles
 
 [pytorch `Transformer` documentation](https://pytorch.org/docs/stable/_modules/torch/nn/modules/transformer.html#Transformer)  
+[*The Annotated Transformer*](http://nlp.seas.harvard.edu/2018/04/03/attention.html#attention)  
+[*TRANSFORMERS FROM SCRATCH*](http://peterbloem.nl/blog/transformers)  
 [*The Illustrated Transformer*](https://jalammar.github.io/illustrated-transformer/)  
 [*Transformers Explained Visually (Part 3): Multi-head Attention, deep dive*](https://towardsdatascience.com/transformers-explained-visually-part-3-multi-head-attention-deep-dive-1c1ff1024853)  
 [*How to code The Transformer in Pytorch*](https://towardsdatascience.com/how-to-code-the-transformer-in-pytorch-24db27c8f9ec#3fa3)  

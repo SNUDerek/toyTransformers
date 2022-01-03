@@ -11,7 +11,6 @@ class MultiHeadAttention(torch.nn.Module):
                  dropout: float=0.0, causal: bool=False, mask_val=-10e8,
                  q_bias: bool=False, kv_bias: float=False, out_bias: float=False):
         super().__init__()
-        
         self.seq_len = seq_len
         self.d_in = d_in
         self.d_attn = d_attn
@@ -32,34 +31,37 @@ class MultiHeadAttention(torch.nn.Module):
         
     def forward(self, q, k, v, q_mask=None, kv_mask=None):
         device = self.dummy
-        b, l, i = q.shape
+        b, l, d = q.shape
         kb, kl, ki = k.shape
         vb, vl, vi = k.shape
         assert kb == vb and kl == vl and ki == vi
         assert b == kb
         assert l == kl
-        assert i == ki == self.d_in
+        assert d == ki == self.d_in
         
-        # linear projection, split into heads, and transpose to (b, h, l, d_attn)
-        _q = self.proj_q(q).reshape((b, l, self.heads, self.d_attn)).transpose(1, 2)
-        _k = self.proj_k(k).reshape((b, l, self.heads, self.d_attn)).transpose(1, 2)
-        _v = self.proj_v(v).reshape((b, l, self.heads, self.d_attn)).transpose(1, 2)
+        # linear projection, split into heads, and transpose to (b * h, l, d_attn)
+        _q = self.dropout(self.proj_q(q)).transpose(1, 2).contiguous().view(b * self.heads, l, self.d_attn)
+        _k = self.dropout(self.proj_k(k)).transpose(1, 2).contiguous().view(b * self.heads, l, self.d_attn)
+        _v = self.dropout(self.proj_v(v)).transpose(1, 2).contiguous().view(b * self.heads, l, self.d_attn)
         
-        # scaled dot product: softmax( Q @ K.T / sqrt(d_k) ) * V
-        _qk = torch.matmul(_q, _k.transpose(-2, -1))/np.sqrt(self.d_attn)
+        # scaled dot product: softmax( Q @ K.T / sqrt(d_k) ) * V >> (b * h, l, l)
+        _qk = torch.bmm(_q, _k.transpose(1, 2))/np.sqrt(self.d_attn)
+        
+        # rehape masks to b* h
+        q_mask = q_mask.unsqueeze(1).expand(-1, self.heads, -1).reshape(b * self.heads, -1)
+        kv_mask = kv_mask.unsqueeze(1).expand(-1, self.heads, -1).reshape(b * self.heads, -1).unsqueeze(1)
         
         # apply padding and sequence masks
-        _qk = self.dropout(_qk)
-        _qk = _qk.masked_fill(self.mask, self.mask_val)
+        _qk.masked_fill_(self.mask, self.mask_val)
         if q_mask is not None:
-            _qk = _qk.masked_fill(q_mask.unsqueeze(1).unsqueeze(-1), self.mask_val)
+            _qk.masked_fill_(q_mask, self.mask_val)
         if kv_mask is not None:
-            _qk = _qk.masked_fill(kv_mask.unsqueeze(1).unsqueeze(1), self.mask_val)
-        scores = torch.nn.functional.softmax(_qk, dim=-1)
-        _attn = torch.matmul(scores, _v)
+            _qk.masked_fill_(kv_mask, self.mask_val)
+        scores = torch.nn.functional.softmax(_qk, dim=-1)  # across each row index 2
+        _attn = torch.bmm(scores, _v).view(b, self.heads, l, self.d_attn)  # (b * h, l, d) >> (b, h, l, d)
         
-        # transpose to (b, h, l, d_attn), reshape to (b, l, h*d_attn), project to (b, l, d_in)
-        _attn = torch.reshape(_attn.transpose(1, 2), (b, l, self.heads * self.d_attn))
+        # transpose to (b, l, h, d_attn), reshape to (b, l, h*d_attn), project to (b, l, d_in)
+        _attn = _attn.transpose(1, 2).contiguous().view(b, l, self.heads * self.d_attn)
         output = self.proj_o(_attn)
         
         return scores, output
@@ -90,11 +92,10 @@ class LearnedPositionalEncoding(torch.nn.Module):
         super().__init__()
         # learned embedding matrix for one sample
         self.learned_embeddings = torch.nn.Parameter(torch.rand(seq_len, d_in).float())
-        torch.nn.init.xavier_normal_(self.learned_embeddings)
 
     def forward(self, embeddings):
         # create positional encoding
-        embeddings *= np.sqrt(embeddings.shape[-1])  # from "Attention..." 3.4
+        embeddings *= np.sqrt(embeddings.shape[-1])  # from "Attention..." section 3.4
         embeddings += self.learned_embeddings.unsqueeze(0).repeat(embeddings.shape[0], 1, 1)
         
         return embeddings
@@ -111,7 +112,7 @@ class SinusoidalPositionalEncoding(torch.nn.Module):
         self.register_buffer("pos_encoding", _pos_encoding)
         
     def forward(self, embeddings):
-        embeddings *= np.sqrt(embeddings.shape[-1])  # from "Attention..." 3.4
+        embeddings *= np.sqrt(embeddings.shape[-1])  # from "Attention..." section 3.4
         embeddings += self.pos_encoding.unsqueeze(0).repeat(embeddings.shape[0], 1, 1)
         
         return embeddings

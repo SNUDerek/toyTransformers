@@ -17,7 +17,7 @@ class TransformerEncoderLayer(torch.nn.Module):
     def __init__(self, 
                  seq_len: int,
                  d_in: int, 
-                 d_attn: int, 
+                 d_attn: int,
                  d_ffnn: int, 
                  attn_heads: int, 
                  attn_dropout: float, 
@@ -63,26 +63,26 @@ class TransformerEncoderLayer(torch.nn.Module):
             
         # multi-head attention sub-block
         if self.pre_ln:
-            residual = x
+            r = x
             x = self.layer_norm_1(x)
             _, x = self.mha(x, x, x, q_mask=pad_mask, kv_mask=pad_mask)
-            x += residual
+            x += r
         else:
-            residual = x
+            r = x
             _, x = self.mha(x, x, x, q_mask=pad_mask, kv_mask=pad_mask)
-            x += residual
+            x += r
             x = self.layer_norm_1(x)
             
         # positionwise FFNN sub-block
         if self.pre_ln:
-            residual = x
+            r = x
             x = self.layer_norm_2(x)
             x = self.ffnn(x)
-            x += residual
+            x += r
         else:
-            residual = x
+            r = x
             x = self.ffnn(x)
-            x += residual
+            x += r
             x = self.layer_norm_2(x)
 
         return x
@@ -161,38 +161,38 @@ class TransformerDecoderLayer(torch.nn.Module):
             
         # causal self-attention sub-block
         if self.pre_ln:
-            residual = x
+            r = x
             x = self.layer_norm_1(x)
             _, x = self.masked_mha(x, x, x, q_mask=pad_mask, kv_mask=pad_mask)
-            x += residual
+            x += r
         else:
-            residual = x
+            r = x
             _, x = self.masked_mha(x, x, x, q_mask=pad_mask, kv_mask=pad_mask)
-            x += residual
+            x += r
             x = self.layer_norm_1(x)
             
         # memory attention
         if self.pre_ln:
-            residual = x
+            r = x
             x = self.layer_norm_2(x)
             _, x = self.mha(x, mem, mem, q_mask=pad_mask, kv_mask=mem_pad_mask)
-            x += residual
+            x += r
         else:
-            residual = x
+            r = x
             _, x = self.mha(x, mem, mem, q_mask=pad_mask, kv_mask=mem_pad_mask)
-            x += residual
+            x += r
             x = self.layer_norm_2(x)
             
         # positionwise FFNN sub-block
         if self.pre_ln:
-            residual = x
+            r = x
             x = self.layer_norm_3(x)
             x = self.ffnn(x)
-            x += residual
+            x += r
         else:
-            residual = x
+            r = x
             x = self.ffnn(x)
-            x += residual
+            x += r
             x = self.layer_norm_3(x)
 
         return x
