@@ -1,7 +1,6 @@
 import torch
 import numpy as np
 
-from mytransformers.functions import get_mask_from_lengths
 from mytransformers.modules import MultiHeadAttention
 from mytransformers.modules import PositionWiseFeedForward
 from mytransformers.modules import SinusoidalPositionalEncoding
@@ -50,26 +49,20 @@ class TransformerEncoderLayer(torch.nn.Module):
         self.layer_norm_2 = torch.nn.LayerNorm(d_in)
         
         
-    def forward(self, x, seq_lens=None):
+    def forward(self, x, seq_lens=None, mask_output=True):
         
         assert x.shape[1] == self.seq_len
         assert x.shape[2] == self.d_in
-        
-        # create 2D mask from lengths
-        if seq_lens is not None:
-            pad_mask = get_mask_from_lengths(seq_lens, x.shape[1], x.device)
-        else:
-            pad_mask = torch.ones(x.shape[0], x.shape[1]).bool().to(x.device)
             
         # multi-head attention sub-block
         if self.pre_ln:
             r = x
             x = self.layer_norm_1(x)
-            _, x = self.mha(x, x, x, q_mask=pad_mask, kv_mask=pad_mask)
+            _, x = self.mha(x, x, x, q_lens=seq_lens, kv_lens=seq_lens)
             x += r
         else:
             r = x
-            _, x = self.mha(x, x, x, q_mask=pad_mask, kv_mask=pad_mask)
+            _, x = self.mha(x, x, x, q_lens=seq_lens, kv_lens=seq_lens)
             x += r
             x = self.layer_norm_1(x)
             
@@ -84,6 +77,11 @@ class TransformerEncoderLayer(torch.nn.Module):
             x = self.ffnn(x)
             x += r
             x = self.layer_norm_2(x)
+            
+        # apply 0 mask based on max sequence lengths 
+        if mask_output and seq_lens is not None:
+            x_pad = torch.arange(x.shape[1])[None, :].expand(x.shape[0], -1).to(x.device) >= seq_lens[:, None]
+            x.masked_fill_(x_pad.unsqueeze(-1), 0.0)
 
         return x
     
@@ -142,32 +140,22 @@ class TransformerDecoderLayer(torch.nn.Module):
         self.layer_norm_3 = torch.nn.LayerNorm(d_in)
         
         
-    def forward(self, mem, x, mem_lens=None, seq_lens=None):
+    def forward(self, mem, x, mem_lens=None, seq_lens=None, mask_output=True):
         
         assert x.shape[1] == self.seq_len
         assert x.shape[2] == self.d_in
         assert mem.shape[1] == self.seq_len
         assert mem.shape[2] == self.d_in
-        
-        # create 2D mask from lengths
-        if seq_lens is not None:
-            pad_mask = get_mask_from_lengths(seq_lens, x.shape[1], x.device)
-        else:
-            pad_mask = torch.ones(x.shape[0], x.shape[1]).bool().to(x.device)
-        if mem_lens is not None:
-            mem_pad_mask = get_mask_from_lengths(mem_lens, x.shape[1], x.device)
-        else:
-            mem_pad_mask = torch.ones(x.shape[0], x.shape[1]).bool().to(x.device)
             
         # causal self-attention sub-block
         if self.pre_ln:
             r = x
             x = self.layer_norm_1(x)
-            _, x = self.masked_mha(x, x, x, q_mask=pad_mask, kv_mask=pad_mask)
+            es, x = self.masked_mha(x, x, x, q_lens=seq_lens, kv_lens=seq_lens)
             x += r
         else:
             r = x
-            _, x = self.masked_mha(x, x, x, q_mask=pad_mask, kv_mask=pad_mask)
+            es, x = self.masked_mha(x, x, x, q_lens=seq_lens, kv_lens=seq_lens)
             x += r
             x = self.layer_norm_1(x)
             
@@ -175,11 +163,11 @@ class TransformerDecoderLayer(torch.nn.Module):
         if self.pre_ln:
             r = x
             x = self.layer_norm_2(x)
-            _, x = self.mha(x, mem, mem, q_mask=pad_mask, kv_mask=mem_pad_mask)
+            ds, x = self.mha(x, mem, mem, q_lens=seq_lens, kv_lens=mem_lens)
             x += r
         else:
             r = x
-            _, x = self.mha(x, mem, mem, q_mask=pad_mask, kv_mask=mem_pad_mask)
+            ds, x = self.mha(x, mem, mem, q_lens=seq_lens, kv_lens=mem_lens)
             x += r
             x = self.layer_norm_2(x)
             
@@ -194,5 +182,10 @@ class TransformerDecoderLayer(torch.nn.Module):
             x = self.ffnn(x)
             x += r
             x = self.layer_norm_3(x)
-
+            
+        # apply 0 mask based on max sequence lengths 
+        if mask_output and seq_lens is not None:
+            x_pad = torch.arange(x.shape[1])[None, :].expand(x.shape[0], -1).to(x.device) >= seq_lens[:, None]
+            x.masked_fill_(x_pad.unsqueeze(-1), 0.0)
+            
         return x

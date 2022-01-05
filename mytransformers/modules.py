@@ -28,8 +28,9 @@ class MultiHeadAttention(torch.nn.Module):
             self.register_buffer("mask", torch.triu(torch.ones((1, self.seq_len, self.seq_len)), diagonal=1).bool())
         else:
             self.register_buffer("mask", torch.zeros((1, self.seq_len, self.seq_len)).bool())
-        
-    def forward(self, q, k, v, q_mask=None, kv_mask=None):
+
+            
+    def forward(self, q, k, v, q_lens=None, kv_lens=None):
         device = self.dummy
         b, l, d = q.shape
         kb, kl, ki = k.shape
@@ -40,29 +41,35 @@ class MultiHeadAttention(torch.nn.Module):
         assert d == ki == self.d_in
         
         # linear projection, split into heads, and transpose to (b * h, l, d_attn)
-        _q = self.dropout(self.proj_q(q)).transpose(1, 2).contiguous().view(b * self.heads, l, self.d_attn)
-        _k = self.dropout(self.proj_k(k)).transpose(1, 2).contiguous().view(b * self.heads, l, self.d_attn)
-        _v = self.dropout(self.proj_v(v)).transpose(1, 2).contiguous().view(b * self.heads, l, self.d_attn)
+        _q = self.proj_q(self.dropout(q)).reshape(b, l, self.heads, self.d_attn).transpose(1, 2).contiguous().view(b * self.heads, l, self.d_attn)
+        _k = self.proj_k(self.dropout(k)).reshape(b, l, self.heads, self.d_attn).transpose(1, 2).contiguous().view(b * self.heads, l, self.d_attn)
+        _v = self.proj_v(self.dropout(v)).reshape(b, l, self.heads, self.d_attn).transpose(1, 2).contiguous().view(b * self.heads, l, self.d_attn)
         
         # scaled dot product: softmax( Q @ K.T / sqrt(d_k) ) * V >> (b * h, l, l)
         _qk = torch.bmm(_q, _k.transpose(1, 2))/np.sqrt(self.d_attn)
-        
-        # rehape masks to b* h
-        q_mask = q_mask.unsqueeze(1).expand(-1, self.heads, -1).reshape(b * self.heads, -1)
-        kv_mask = kv_mask.unsqueeze(1).expand(-1, self.heads, -1).reshape(b * self.heads, -1).unsqueeze(1)
-        
-        # apply padding and sequence masks
+ 
+        # apply temporal mask
         _qk.masked_fill_(self.mask, self.mask_val)
-        if q_mask is not None:
-            _qk.masked_fill_(q_mask, self.mask_val)
-        if kv_mask is not None:
-            _qk.masked_fill_(kv_mask, self.mask_val)
+        
+        # create and apply padding mask of shape (b * h, l, l) from q, k seq lens
+        if q_lens is not None:
+            q_mask = torch.arange(l)[None, :].expand(b, -1).to(q.device) < q_lens[:, None]  # (1, seq_len)
+        else:
+            q_mask = torch.ones(1, l).to(q.device)
+        if kv_lens is not None:
+            kv_mask = torch.arange(l)[None, :].expand(b, -1).to(k.device) < kv_lens[:, None]  # (1, seq_len)
+        else:
+            kv_mask = torch.ones(1, l).to(k.device)
+        qvk_mask = ~torch.bmm(q_mask.float().unsqueeze(-1), kv_mask.float().unsqueeze(1)).bool()
+        qvk_mask = qvk_mask.unsqueeze(1).expand(-1, self.heads, -1, -1).reshape(b * self.heads, l, l)
+        _qk.masked_fill_(qvk_mask, self.mask_val)
+
+        # attention scores
         scores = torch.nn.functional.softmax(_qk, dim=-1)  # across each row index 2
         _attn = torch.bmm(scores, _v).view(b, self.heads, l, self.d_attn)  # (b * h, l, d) >> (b, h, l, d)
         
         # transpose to (b, l, h, d_attn), reshape to (b, l, h*d_attn), project to (b, l, d_in)
-        _attn = _attn.transpose(1, 2).contiguous().view(b, l, self.heads * self.d_attn)
-        output = self.proj_o(_attn)
+        output = self.proj_o(_attn.transpose(1, 2).contiguous().view(b, l, self.heads * self.d_attn))
         
         return scores, output
     

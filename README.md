@@ -4,7 +4,7 @@
 
 ## about
 
-inspired by [minGPT](https://github.com/karpathy/minGPT), i wanted to implement some basic transformer models "from scratch" by following the original papers. this is a purely academic challenge for myself, a practicum of sorts for my transformer reading, and this code is not intended to be suitable for any real-world applications. while i am trying to adhere to the original papers as my primary reference, i am checking my code against other implementations to ensure that i am not totally off-base, and modifying it as necessary. that said, i do not guarantee the accuracy of my implementation, and any implementational errors are my own.
+inspired by [minGPT](https://github.com/karpathy/minGPT), i wanted to implement some basic transformer models "from scratch" by following the original papers. this is a purely academic challenge for myself, a practicum of sorts for my transformer reading, and this code is not intended to be suitable for any real-world applications. while i am trying to adhere to the original papers as my primary reference, i am checking my code against other implementations to ensure that i am not totally off-base, and modifying as necessary. that said, i do not guarantee the accuracy of my implementation, and any implementational errors are my own.
 
 ## current status & plans
 
@@ -14,12 +14,15 @@ inspired by [minGPT](https://github.com/karpathy/minGPT), i wanted to implement 
 - [x] basic transformer decoder layer, from [*Attention is All You Need*](https://arxiv.org/abs/1706.03762)
 - [x] sentencepiece-based tokenizer
 - [x] transformer seq2seq model, from [*Attention is All You Need*](https://arxiv.org/abs/1706.03762)
-- [ ] all above tested with basic seq2seq training and generation scripts (translation task)
+- [x] example seq2seq training (notebook)
+- [ ] example seq2seq inference with beam search (notebook)
 - [ ] GPT-style decoder and example, from [*Improving Language Understanding
 by Generative Pre-Training*](https://s3-us-west-2.amazonaws.com/openai-assets/research-covers/language-unsupervised/language_understanding_paper.pdf)
 - [ ] BERT-style encoder and example, from [*BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding*](https://arxiv.org/abs/1810.04805)
 - [ ] ALBERT-style encoder and example, from [*ALBERT: A Lite BERT for Self-supervised Learning of Language Representations*](https://arxiv.org/abs/1909.11942)
 - [ ] newer positional embeddings besides learned and sinusoidal
+- [ ] proper training, eval scripts
+- [ ] tensorboard integration
 
 ## environment
 

@@ -124,10 +124,26 @@ class SentencePieceTokenizer:
         return self.sp.encode(texts, out_type=int)
     
     
+    def get_vocabulary(self):
+        """get token list of (id, token) tuples"""
+        return [(id, self.sp.IdToPiece(id)) for id in range(self.sp.GetPieceSize())]
+    
+    
     def export_model(self, file_path):
         """export the inner sentencepiece model for use with sentencepiece library"""
         with open(file_path, "wb") as out:
             out.write(self.sp.serialized_model_proto())
+        return True
+    
+    
+    def export_vocab(self, file_path):
+        """export the inner sentencepiece model for use with sentencepiece library"""
+        vocab = self.get_vocabulary()
+        with open(file_path, "w") as out:
+            for i, v in enumerate(vocab):
+                if i > 0:
+                    out.write("\n")
+                out.write("{}\t{}".format(v[0], v[1]))
         return True
     
     
@@ -136,8 +152,77 @@ class SentencePieceTokenizer:
         self.sp = spm.SentencePieceProcessor(model_file=file_path)
         return True
     
-    
+
 class SimpleTranslationDataset(torch.utils.data.Dataset):
+    """Face Landmarks dataset."""
+
+    def __init__(self, source_file, target_file, src_tokenizer=None, tgt_tokenizer=None, share_tokenizer=False, sep="\t", verbose=True, **kwargs):
+        """simple dataset for translation"""
+        self.share_tokenizer = share_tokenizer
+        self.source = open(source_file).read().split("\n")
+        self.target = open(target_file).read().split("\n")
+        if len(self.source[-1]) < 1:
+            self.source = self.source[:-1]
+        if len(self.target[-1]) < 1:
+            self.target = self.target[:-1]
+        if len(self.source) != len(self.target):
+            raise ValueError("source file len '{}' != target file len '{}'!".format(len(self.source), len(self.target)))
+        if src_tokenizer is None:
+            if verbose: print("fitting tokenizer...")
+            if self.share_tokenizer:
+                self.src_tokenizer = SentencePieceTokenizer()
+                _ = self.src_tokenizer.fit(self.source + self.target, **kwargs)
+                self.tgt_tokenizer = self.src_tokenizer
+            else:
+                if verbose: print("fitting source tokenizer...")
+                self.src_tokenizer = SentencePieceTokenizer()
+                _ = self.src_tokenizer.fit(self.source, **kwargs)
+                if tgt_tokenizer is None:
+                    if verbose: print("fitting target tokenizer...")
+                    self.tgt_tokenizer = SentencePieceTokenizer()
+                    _ = self.tgt_tokenizer.fit(self.target, **kwargs)
+        else:
+            self.src_tokenizer = src_tokenizer
+            if tgt_tokenizer is None:
+                if verbose: print("fitting target tokenizer...")
+                self.tgt_tokenizer = SentencePieceTokenizer()
+                _ = self.tgt_tokenizer.fit(self.target, **kwargs)
+            else:
+                self.tgt_tokenizer = tgt_tokenizer
+                
+                
+    def preview(self):
+        for index in [0, len(self.source)//2, len(self.source)-1]:
+            print("index {}".format(index))
+            print("\tsource input : {}".format(self.source[index]))
+            print("\ttarget input : {}".format(self.target[index]))
+            print("\tsource tokens: {}".format(" ".join(self.src_tokenizer.tokenize_as_string(self.source[index]))))
+            print("\ttarget tokens: {}".format(" ".join(self.tgt_tokenizer.tokenize_as_string(self.target[index]))))
+            print("---------------------------------------------------------------------------------------------------------")
+                    
+                    
+    def get_tokenizers(self):
+                    
+        return self.src_tokenizer, self.tgt_tokenizer
+                    
+        
+    def __len__(self):
+        return len(self.source)
+    
+
+    def __getitem__(self, idx):
+
+        if self.share_tokenizer:
+            x, x_len = self.src_tokenizer.transform(self.source[idx], as_array=False, bos=True, eos=True)
+            y, y_len = self.src_tokenizer.transform(self.target[idx], as_array=False, bos=True, eos=True)
+        else:
+            x, x_len = self.src_tokenizer.transform(self.source[idx], as_array=False, bos=True, eos=True)
+            y, y_len = self.tgt_tokenizer.transform(self.target[idx], as_array=False, bos=True, eos=True)
+
+        return x[0], y[0], x_len[0], y_len[0]
+
+    
+class SimpleCSVTranslationDataset(torch.utils.data.Dataset):
     """Face Landmarks dataset."""
 
     def __init__(self, csv_filepath, src_tokenizer=None, tgt_tokenizer=None, share_tokenizer=False, sep="\t", verbose=True, **kwargs):

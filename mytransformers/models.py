@@ -3,7 +3,6 @@ import numpy as np
 import torch
 import tqdm
 
-from mytransformers.functions import get_mask_from_lengths
 from mytransformers.modules import LearnedPositionalEncoding
 from mytransformers.modules import SinusoidalPositionalEncoding
 from mytransformers.layers import TransformerEncoderLayer
@@ -143,7 +142,7 @@ class TransformerModel(torch.nn.Module):
     def initialize(self):
         for p in self.parameters():
             if p.dim() > 1:
-                torch.nn.init.xavier_uniform(p)
+                torch.nn.init.xavier_uniform_(p)
         return
     
     
@@ -157,10 +156,6 @@ class TransformerModel(torch.nn.Module):
         for enc_lyr in self.encoder_layers:
             x = enc_lyr(x, seq_lens=x_lens)
             x = self.dropout(x)
-        # zero-mask the padded indices
-        if x_lens is not None:
-            x_pad = get_mask_from_lengths(x_lens, self.seq_len, x.device)
-            x.masked_fill_(x_pad.unsqueeze(-1), 0.0)
         
         # decoder with shifted inputs
         if self.shared_vocab:
@@ -186,11 +181,11 @@ class TransformerModel(torch.nn.Module):
                 w = self.embedding.weight
             else:
                 w = self.tgt_embedding.weight
-            y = torch.matmul(y, w.t())
+            y = torch.matmul(y, w.t().unsqueeze(0))
         else:
             y = self.proj_from(y)
         
-        return y
+        return x, y
     
     
     def infer_one_greedy(self, x, x_lens, bos=2, eos=3, verbose=False):
@@ -208,7 +203,7 @@ class TransformerModel(torch.nn.Module):
             x = enc_lyr(x, seq_lens=x_lens)
         # zero-mask the padded indices
         if x_lens is not None:
-            x_pad = get_mask_from_lengths(x_lens, self.seq_len, x.device)
+            x_pad = torch.arange(x.shape[1])[None, :].expand(x.shape[0], -1).to(x.device) >= x_lens[:, None]
             x.masked_fill_(x_pad.unsqueeze(-1), 0.0)
 
         rng = tqdm.trange(self.seq_len-1) if verbose else range(self.seq_len-1)
@@ -237,7 +232,7 @@ class TransformerModel(torch.nn.Module):
                     w = self.embedding.weight
                 else:
                     w = self.tgt_embedding.weight
-                y = torch.matmul(y, w.t())
+                y = torch.matmul(y, w.t().unsqueeze(0))
             else:
                 y = self.proj_from(y)
 
