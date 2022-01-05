@@ -10,8 +10,8 @@ def pad_to_seq_len(batch, max_seq_len):
     x_list, y_list, x_len_list, y_len_list = list(zip(*batch))
     x_len_list = [min(x, max_seq_len) for x in x_len_list]
     y_len_list = [min(y, max_seq_len) for y in y_len_list]
-    x_array = np.array([np.pad(np.array(x[:max_seq_len]), (0, max_seq_len-len(x))) for x in x_list])
-    y_array = np.array([np.pad(np.array(y[:max_seq_len+1]), (0, max_seq_len-len(y)+1)) for y in y_list])
+    x_array = np.array([np.pad(np.array(x[:max_seq_len]), (0, max(0, max_seq_len-len(x)))) for x in x_list])
+    y_array = np.array([np.pad(np.array(y[:max_seq_len+1]), (0, max(0, max_seq_len-len(y)+1))) for y in y_list])
     x_tensor = torch.from_numpy(x_array).long()
     y_in_tensor = torch.from_numpy(y_array[:,:-1]).long()
     y_out_tensor = torch.from_numpy(y_array[:,1:]).long()
